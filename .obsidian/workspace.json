@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "HW06/HW06.md",
+                "file": "HW07/HW07.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "HW06"
+              "title": "HW07"
             }
           }
         ]
@@ -183,10 +183,10 @@
       "bases:Создать новую базу": false
     }
   },
-  "active": "9b0c67076dc56ffa",
+  "active": "7e5f941cf1e2d2ff",
   "lastOpenFiles": [
-    "HW05/HW05.md",
     "HW06/HW06.md",
+    "HW05/HW05.md",
     "HW06"
   ]
 }
