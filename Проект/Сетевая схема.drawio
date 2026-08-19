@@ -1,0 +1,28 @@
+<mxfile host="Electron">
+  <diagram name="Страница-1" id="FZf9DmzOmL5ZmeftV99i">
+    <mxGraphModel dx="1016" dy="663" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="zXaXKJJp9WkpqxaO7vUb-1" parent="1" style="rounded=1;strokeColor=#000000;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=15;fontColor=#000000;fillColor=light-dark(#7ED321,#7ED321);html=1;whiteSpace=wrap;fontStyle=0" value="Текст" vertex="1">
+          <mxGeometry height="140" width="305" x="109" y="92.25" as="geometry" />
+        </mxCell>
+        <mxCell id="zXaXKJJp9WkpqxaO7vUb-2" parent="1" style="rounded=1;strokeColor=#000000;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=15;fontColor=#000000;fillColor=light-dark(#00AEEF,#00AEEF);html=1;whiteSpace=wrap;" value="Текст" vertex="1">
+          <mxGeometry height="64.5" width="200" x="230" y="320" as="geometry" />
+        </mxCell>
+        <mxCell id="zXaXKJJp9WkpqxaO7vUb-3" parent="1" style="rounded=1;strokeColor=#000000;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=15;fontColor=#000000;fillColor=light-dark(#F5A623,#F5A623);html=1;whiteSpace=wrap;" value="Текст" vertex="1">
+          <mxGeometry height="64.5" width="200" x="250" y="460" as="geometry" />
+        </mxCell>
+        <mxCell id="zXaXKJJp9WkpqxaO7vUb-4" parent="1" style="rounded=1;strokeColor=#3700CC;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=15;fontColor=#ffffff;fillColor=#6a00ff;html=1;whiteSpace=wrap;" value="Текст" vertex="1">
+          <mxGeometry height="64.5" width="200" x="560" y="290.0000000000002" as="geometry" />
+        </mxCell>
+        <mxCell id="zXaXKJJp9WkpqxaO7vUb-5" parent="1" style="rounded=1;strokeColor=#314354;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=15;fontColor=#ffffff;fillColor=#647687;html=1;whiteSpace=wrap;" value="Текст" vertex="1">
+          <mxGeometry height="64.5" width="200" x="680" y="130.00000000000023" as="geometry" />
+        </mxCell>
+        <mxCell id="zXaXKJJp9WkpqxaO7vUb-6" parent="1" style="rounded=1;strokeColor=#36393d;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=15;fillColor=#ffff88;html=1;whiteSpace=wrap;" value="Текст" vertex="1">
+          <mxGeometry height="30" width="90" x="510" y="440" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
