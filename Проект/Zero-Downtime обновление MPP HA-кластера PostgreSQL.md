@@ -281,93 +281,16 @@ provider_installation {
 ```bash
 nano providers.tf
 ```
-```yaml
-terraform {
-  required_providers {
-    yandex = {
-      source = "yandex-cloud/yandex"
-    }
-  }
-  required_version = ">= 0.13"
-}
-
-provider "yandex" {
-  service_account_key_file = "key.json"
-  cloud_id  = "b1gmqqn8huu6s39112te"
-  folder_id = "b1gk5pe5h3541d01896e"
-  zone      = "ru-central1-a"
-}
-```
 
 Создаю файл переменных:
 ```bash
 nano variables.tf
-```
-```yaml
-variable "cloud_id" {
-  description = "Yandex Cloud ID"
-  type        = string
-}
-
-variable "folder_id" {
-  description = "Yandex Cloud Folder ID"
-  type        = string
-}
-
-variable "zone" {
-  description = "Availability zone"
-  type        = string
-  default     = "ru-central1-a"
-}
-
-variable "ssh_public_key" {
-  description = "Path to public SSH key"
-  type        = string
-}
-
-variable "subnet_cidr" {
-	description = "CIDR for subnet"
-	type = string
-}
-
-variable "vm_resources" {
-	description = "Resources for VMs by role"
-	type = map(object({
-		cores = number
-		memory = number
-		disk_size = number
-		disk_type = string
-	}))
-}
-
-variable "vm_count" {
-	description = "Number of VMs by role"
-	type = map(number)
-}
-
-variable "vm_ips" {
-	description = "Static IPs for VMs"
-	type = map(list(string))
-}
 ```
 
 Создаю файл значений переменных:
 ```bash
 nano terraform.tfvars
 ```
-```yaml
-cloud_id = "b1gmqqn8huu6s39112te"
-folder_id = "b1gk5pe5h3541d01896e"
-zone = "ru-central1-a"
-ssh_public_key = "/home/stanislav/terraform/ssh-postgresql-update"
-subnet_cidr = "10.10.0.0/16"
 
-vm_resources = {
-  dcs      = { cores = 2, memory = 4,  disk_size = 20, disk_type = "network-ssd", preemptible = false, platform_id = "standard-v2" }
-  coord    = { cores = 4, memory = 8,  disk_size = 50, disk_type = "network-ssd", preemptible = false, platform_id = "standard-v2" }
-  worker   = { cores = 4, memory = 8,  disk_size = 50, disk_type = "network-ssd", preemptible = false, platform_id = "standard-v2" }
-  balancer = { cores = 2, memory = 4,  disk_size = 20, disk_type = "network-ssd", preemptible = false, platform_id = "standard-v2" }
-  monitor  = { cores = 2, memory = 4,  disk_size = 20, disk_type = "network-ssd", preemptible = false, platform_id = "standard-v2" }
-  rc       = { cores = 2, memory = 4,  disk_size = 100, disk_type = "network-ssd", preemptible = false, platform_id = "standard-v2" }
-}
-```
+Создаю файл main.tf
+
