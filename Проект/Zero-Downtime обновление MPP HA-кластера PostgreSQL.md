@@ -1,33 +1,6 @@
 # План работ
 1. Развернуть инфраструктуру 
-   - DCS: etcd (3 узла), etcd_exporter, node_exporter, Alloy
-   - Coord, Worker1, Worker2: PostgreSQL 16 + Patroni + Citus, wal-g, postgres_exporter, node_exporter, Alloy
-   - Balancer: HAProxy, PgBouncer, Keepalived, haproxy_exporter, pgbouncer_exporter, keepalived_exporter, node_exporter, Alloy
-   - Monitor: Prometheus, Alertmanager, Grafana, Loki, Alloy, node_exporter
-   - RC: MinIO, NFS-сервер, node_exporter, Alloy
-   - Настроить Patroni (управление кластерами через etcd), Citus (координатор + воркеры), HAProxy (порты 5000/5001 для клиентов, 5010/5020 для воркеров), PgBouncer (пулы primary/standby для координатора)
-   - Настроить Keepalived (общий VIP для балансировщиков)
-   - Проверить работу репликации и переключения (ручной failover)
-2. Настроить мониторинг
-   - Prometheus: сбор метрик с node_exporter, postgres_exporter, etcd_exporter, haproxy_exporter, pgbouncer_exporter, keepalived_exporter
-   - Grafana: дашборды для:
-     - Производительность запросов: TPS, QPS, среднее время, топ медленных запросов
-     - Соединения: число активных, % использования max_connections
-     - Ресурсы сервера: CPU, память, swap, дисковый I/O, сеть
-     - Кэш: Cache Hit Ratio (>99%)
-     - Блокировки: ожидания, deadlocks, длительные транзакции
-     - Репликация: lag, статус
-     - Диск: размер БД, свободное место
-     - Autovacuum: dead tuples, время последнего vacuum/analyze
-     - Ошибки: логи PostgreSQL, отмены запросов
-   - Loki + Alloy: сбор логов PostgreSQL, Patroni, HAProxy, PgBouncer
-   - Alertmanager: правила алертов (например, высокая задержка репликации, переполнение диска)
-3. Настроить резервное копирование
-   - wal-g: полные и инкрементальные бэкапы баз данных в MinIO (S3)
-   - Настроить архивирование WAL в MinIO
-   - Настроить снапшоты etcd и сохранение на NFS (RC)
-   - Проверить восстановление из бэкапа на тестовом узле (опционально)
-4. Наполнить кластер данными
+2. Наполнить кластер данными
    - Загрузить тренировочную БД от Postgres Pro (например, demo-база среднего размера)
    - Распределить таблицы по воркерам с помощью Citus (create_distributed_table)
    - Убедиться, что данные корректно распределены и доступны через координатор
@@ -48,78 +21,51 @@
 
 # Архитектура
 
-| Hostname  | IP-адрес   | Роль     | Компоненты                                                                                                      |
-| --------- | ---------- | -------- | --------------------------------------------------------------------------------------------------------------- |
-| dcs1      | 10.10.0.10 | DCS      | Etcd, etcd_exporter, node_exporter, Alloy                                                                       |
-| dcs2      | 10.10.0.11 | DCS      | Etcd, etcd_exporter, node_exporter, Alloy                                                                       |
-| dcs3      | 10.10.0.12 | DCS      | Etcd, etcd_exporter, node_exporter, Alloy                                                                       |
-| coord1    | 10.10.0.20 | Coord    | PostgreSQL, Patroni, wal-g, postgres_exporter, node_exporter, Alloy                                             |
-| coord2    | 10.10.0.21 | Coord    | PostgreSQL, Patroni, wal-g, postgres_exporter, node_exporter, Alloy                                             |
-| coord3    | 10.10.0.22 | Coord    | PostgreSQL, Patroni, wal-g, postgres_exporter, node_exporter, Alloy                                             |
-| worker11  | 10.10.0.30 | Worker1  | PostgreSQL, Patroni, wal-g, postgres_exporter, node_exporter, Alloy                                             |
-| worker12  | 10.10.0.31 | Worker1  | PostgreSQL, Patroni, wal-g, postgres_exporter, node_exporter, Alloy                                             |
-| worker13  | 10.10.0.32 | Worker1  | PostgreSQL, Patroni, wal-g, postgres_exporter, node_exporter, Alloy                                             |
-| worker21  | 10.10.0.40 | Worker2  | PostgreSQL, Patroni, wal-g, postgres_exporter, node_exporter, Alloy                                             |
-| worker22  | 10.10.0.41 | Worker2  | PostgreSQL, Patroni, wal-g, postgres_exporter, node_exporter, Alloy                                             |
-| worker23  | 10.10.0.42 | Worker2  | PostgreSQL, Patroni, wal-g, postgres_exporter, node_exporter, Alloy                                             |
-| balancer1 | 10.10.0.50 | Balancer | HAProxy, PgBouncer, Keepalived, haproxy_exporter, pgbouncer_exporter, node_exporter, Alloy, keepalived_exporter |
-| balancer2 | 10.10.0.51 | Balancer | HAProxy, PgBouncer, Keepalived, haproxy_exporter, pgbouncer_exporter, node_exporter, Alloy, keepalived_exporter |
-| monitor   | 10.10.0.60 | Monitor  | Prometheus, Alertmanager, Grafana, Loki, Alloy, node_exporter                                                   |
-| rc        | 10.10.0.70 | RC       | MinIO, NFS-сервер, node_exporter, Alloy                                                                         |
-| client    | 10.10.0.80 | client   | ansible, terraform, yc, pgbench                                                                                 |
+| Hostname | IP-адрес   | Роль     | Компоненты                      |
+| -------- | ---------- | -------- | ------------------------------- |
+| dcs1     | 10.10.0.10 | DCS      | Etcd                            |
+| dcs2     | 10.10.0.11 | DCS      | Etcd                            |
+| dcs3     | 10.10.0.12 | DCS      | Etcd                            |
+| coord1   | 10.10.0.20 | Coord    | PostgreSQL, Patroni             |
+| coord2   | 10.10.0.21 | Coord    | PostgreSQL, Patroni             |
+| worker11 | 10.10.0.30 | Worker1  | PostgreSQL, Patroni             |
+| worker12 | 10.10.0.31 | Worker1  | PostgreSQL, Patroni             |
+| worker21 | 10.10.0.40 | Worker2  | PostgreSQL, Patroni             |
+| worker22 | 10.10.0.41 | Worker2  | PostgreSQL, Patroni             |
+| balancer | 10.10.0.50 | Balancer | HAProxy, PgBouncer              |
+| client   | 10.10.0.70 | client   | ansible, terraform, yc, pgbench |
 
 # Сетевое взаимодействие
 
-| Источник (hostname)                                                                                                                     | Получатель (hostname)                                                                                                                   | Протокол / Порт | Комментарий                                                      |
-| --------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | --------------- | ---------------------------------------------------------------- |
-| dcs1, dcs2, dcs3                                                                                                                        | dcs1, dcs2, dcs3                                                                                                                        | TCP/2380        | Raft-репликация между etcd-узлами                                |
-| coord1, coord2, coord3, worker11, worker12, worker13, worker21, worker22, worker23                                                      | dcs1, dcs2, dcs3                                                                                                                        | TCP/2379        | Хранение состояния кластера patroni, выбор лидера, конфигурация  |
-| dcs1, dcs2, dcs3                                                                                                                        | dcs1, dcs2, dcs3                                                                                                                        | TCP/2379        | Сбор метрик etcd (etcd_exporter → etcd локально)                 |
-| coord1, coord2, coord3                                                                                                                  | coord1, coord2, coord3                                                                                                                  | TCP/5432        | Потоковая репликация внутри Coordinator                          |
-| worker11, worker12, worker13                                                                                                            | worker11, worker12, worker13                                                                                                            | TCP/5432        | Потоковая репликация внутри Worker1                              |
-| worker21, worker22, worker23                                                                                                            | worker21, worker22, worker23                                                                                                            | TCP/5432        | Потоковая репликация внутри Worker2                              |
-| coord1, coord2, coord3                                                                                                                  | coord1, coord2, coord3                                                                                                                  | TCP/5432        | Patroni управляет локальным PostgreSQL (Coord)                   |
-| worker11, worker12, worker13                                                                                                            | worker11, worker12, worker13                                                                                                            | TCP/5432        | Patroni управляет локальным PostgreSQL (Worker1)                 |
-| worker21, worker22, worker23                                                                                                            | worker21, worker22, worker23                                                                                                            | TCP/5432        | Patroni управляет локальным PostgreSQL (Worker2)                 |
-| balancer1, balancer2                                                                                                                    | balancer1, balancer2                                                                                                                    | TCP/5000        | PgBouncer → локальный HAProxy (порт 5000, для пула coord_rw)     |
-| balancer1, balancer2                                                                                                                    | balancer1, balancer2                                                                                                                    | TCP/5001        | PgBouncer → локальный HAProxy (порт 5001, для пула coord_r)      |
-| balancer1, balancer2                                                                                                                    | coord1, coord2, coord3, worker11, worker12, worker13, worker21, worker22, worker23                                                      | TCP/8008        | Health‑check HAProxy → Patroni всех узлов                        |
-| balancer1, balancer2                                                                                                                    | coord1, coord2, coord3                                                                                                                  | TCP/5432        | Проксирование трафика от клиента к primary/standby Coordinator   |
-| coord1, coord2, coord3                                                                                                                  | balancer1, balancer2                                                                                                                    | TCP/5010        | Coordinator подключается к primary Worker1 через балансировщик   |
-| coord1, coord2, coord3                                                                                                                  | balancer1, balancer2                                                                                                                    | TCP/5020        | Coordinator подключается к primary Worker2 через балансировщик   |
-| balancer1, balancer2                                                                                                                    | worker11, worker12, worker13                                                                                                            | TCP/5432        | Проксирование трафика от координатора к текущему primary Worker1 |
-| balancer1, balancer2                                                                                                                    | worker21, worker22, worker23                                                                                                            | TCP/5432        | Проксирование трафика от координатора к текущему primary Worker2 |
-| balancer1                                                                                                                               | balancer2                                                                                                                               | VRRP            | Обмен VRRP-пакетами для выбора активного узла, управляющего VIP  |
-| monitor                                                                                                                                 | dcs1, dcs2, dcs3, coord1, coord2, coord3, worker11, worker12, worker13, worker21, worker22, worker23, balancer1, balancer2, monitor, rc | TCP/9100        | Сбор системных метрик (node_exporter)                            |
-| monitor                                                                                                                                 | coord1, coord2, coord3, worker11, worker12, worker13, worker21, worker22, worker23                                                      | TCP/9187        | Сбор метрик PostgreSQL (postgres_exporter)                       |
-| monitor                                                                                                                                 | dcs1, dcs2, dcs3                                                                                                                        | TCP/9300        | Сбор метрик etcd (etcd_exporter)                                 |
-| monitor                                                                                                                                 | balancer1, balancer2                                                                                                                    | TCP/9101        | Сбор метрик HAProxy (haproxy_exporter)                           |
-| monitor                                                                                                                                 | balancer1, balancer2                                                                                                                    | TCP/9127        | Сбор метрик PgBouncer (pgbouncer_exporter)                       |
-| monitor                                                                                                                                 | balancer1, balancer2                                                                                                                    | TCP/9650        | Сбор метрик Keepalived (keepalived_exporter)                     |
-| dcs1, dcs2, dcs3, coord1, coord2, coord3, worker11, worker12, worker13, worker21, worker22, worker23, balancer1, balancer2, monitor, rc | monitor                                                                                                                                 | TCP/3100        | Отправка логов в Loki (Alloy → Loki)                             |
-| monitor                                                                                                                                 | monitor                                                                                                                                 | TCP/9090        | Grafana → Prometheus (запрос метрик)                             |
-| monitor                                                                                                                                 | monitor                                                                                                                                 | TCP/3100        | Grafana → Loki (запрос логов)                                    |
-| monitor                                                                                                                                 | monitor                                                                                                                                 | TCP/9093        | Prometheus → Alertmanager (отправка алертов)                     |
-| coord1, coord2, coord3, worker11, worker12, worker13, worker21, worker22, worker23                                                      | rc                                                                                                                                      | TCP/9000        | wal‑g → MinIO (бэкапы СУБД)                                      |
-| dcs1, dcs2, dcs3                                                                                                                        | rc                                                                                                                                      | TCP/2049        | Сохранение снапшотов etcd на NFS‑шару                            |
-| client                                                                                                                                  | balancer1, balancer2                                                                                                                    | TCP/6432        | Подключение клиента к pgbouncer                                  |
-
-
+| Источник (hostname)                                    | Получатель (hostname)                                  | Протокол / Порт | Комментарий                                                      |
+| ------------------------------------------------------ | ------------------------------------------------------ | --------------- | ---------------------------------------------------------------- |
+| dcs1, dcs2, dcs3                                       | dcs1, dcs2, dcs3                                       | TCP/2380        | Raft-репликация между etcd-узлами                                |
+| coord1, coord2, worker11, worker12, worker21, worker22 | dcs1, dcs2, dcs3                                       | TCP/2379        | Хранение состояния кластера Patroni, выбор лидера, конфигурация  |
+| coord1, coord2                                         | coord1, coord2                                         | TCP/5432        | Потоковая репликация внутри Coordinator                          |
+| worker11, worker12                                     | worker11, worker12                                     | TCP/5432        | Потоковая репликация внутри Worker1                              |
+| worker21, worker22                                     | worker21, worker22                                     | TCP/5432        | Потоковая репликация внутри Worker2                              |
+| coord1, coord2                                         | coord1, coord2                                         | TCP/5432        | Patroni управляет локальным PostgreSQL (Coord)                   |
+| worker11, worker12                                     | worker11, worker12                                     | TCP/5432        | Patroni управляет локальным PostgreSQL (Worker1)                 |
+| worker21, worker22                                     | worker21, worker22                                     | TCP/5432        | Patroni управляет локальным PostgreSQL (Worker2)                 |
+| balancer                                               | balancer                                               | TCP/5000        | PgBouncer → локальный HAProxy (порт 5000, для пула coord_rw)     |
+| balancer                                               | balancer                                               | TCP/5001        | PgBouncer → локальный HAProxy (порт 5001, для пула coord_r)      |
+| balancer                                               | coord1, coord2, worker11, worker12, worker21, worker22 | TCP/8008        | Health‑check HAProxy → Patroni всех узлов                        |
+| balancer                                               | coord1, coord2                                         | TCP/5432        | Проксирование трафика от клиента к primary/standby Coordinator   |
+| coord1, coord2                                         | balancer                                               | TCP/5010        | Coordinator подключается к primary Worker1 через балансировщик   |
+| coord1, coord2                                         | balancer                                               | TCP/5020        | Coordinator подключается к primary Worker2 через балансировщик   |
+| balancer                                               | worker11, worker12                                     | TCP/5432        | Проксирование трафика от координатора к текущему primary Worker1 |
+| balancer                                               | worker21, worker22                                     | TCP/5432        | Проксирование трафика от координатора к текущему primary Worker2 |
+| client                                                 | balancer                                               | TCP/6432        | Подключение клиента к PgBouncer                                  |
 # Cхемы
 ## Информационный поток
-![](../project/Pasted%20image%2020260825151039.png)
-## Мониторинг
-![](../project/Pasted%20image%2020260825145120.png)
-## Резервное копирование
-![](../project/Pasted%20image%2020260825123932.png)
+![](../project/Pasted%20image%2020260826123510.png)
 ## PostgreSQL репликация
-![](../project/Pasted%20image%2020260825124119.png)
+![](../project/Pasted%20image%2020260826123616.png)
 ## Etcd кластер
-![](../project/Pasted%20image%2020260825124154.png)
-## Кластер балансировщиков
-![](../project/Pasted%20image%2020260825124215.png)
+![](../project/Pasted%20image%2020260826123632.png)
+
 ## Взаимодействие Patroni и etcd
-![](../project/Pasted%20image%2020260825124247.png)
+![](../project/Pasted%20image%2020260826123708.png)
 # Разворачиваем инфраструктуру
 ## Client
 Вручную разворачиваю ВМ Client в Yandex Cloud:
@@ -293,4 +239,32 @@ nano terraform.tfvars
 ```
 
 Создаю файл main.tf
+```
+nano main.tf
+```
+
+Инициализирую terraform:
+```
+terraform init
+```
+
+Форматирую файлы:
+```
+terraform fmt
+```
+
+Валидирую файлы:
+```
+terraform validate
+```
+
+Вывожу список планируемых ресурсов:
+```
+terraform plan
+```
+
+Запускаю создание ресурсов:
+```
+terraform apply
+```
 

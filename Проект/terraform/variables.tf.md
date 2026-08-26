@@ -1,4 +1,7 @@
+
 ```
+# variables.tf
+
 variable "cloud_id" {
   description = "Yandex Cloud ID"
   type        = string
