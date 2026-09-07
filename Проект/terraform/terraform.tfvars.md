@@ -14,11 +14,11 @@ network_name              = "default"
 subnet_name               = "postgresql-update"
 
 vm_resources = {
-  dcs      = { cores = 2, memory = 4,  disk_size = 20, disk_type = "network-ssd" }
-  coord    = { cores = 2, memory = 4,  disk_size = 50, disk_type = "network-hdd" }
-  worker1  = { cores = 4, memory = 8,  disk_size = 50, disk_type = "network-hdd" }
-  worker2  = { cores = 4, memory = 8,  disk_size = 50, disk_type = "network-hdd" }
-  balancer = { cores = 2, memory = 4,  disk_size = 20, disk_type = "network-hdd" }
+  dcs      = { cores = 2, memory = 2,  disk_size = 20, disk_type = "network-ssd" }
+  coord    = { cores = 2, memory = 2,  disk_size = 30, disk_type = "network-hdd" }
+  worker1  = { cores = 2, memory = 2,  disk_size = 30, disk_type = "network-hdd" }
+  worker2  = { cores = 2, memory = 2,  disk_size = 30, disk_type = "network-hdd" }
+  balancer = { cores = 2, memory = 2,  disk_size = 20, disk_type = "network-hdd" }
 }
 
 vm_count = {

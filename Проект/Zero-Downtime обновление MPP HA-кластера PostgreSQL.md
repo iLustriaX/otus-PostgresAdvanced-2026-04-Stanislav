@@ -71,7 +71,7 @@
 Вручную разворачиваю ВМ Client в Yandex Cloud:
 **ОС**: `Ubuntu 24.04`
 **Зона доступности**: `ru-central1-a`
-**Диск**: `SSD 20ГБ`
+**Диск**: `HDD 20ГБ`
 **Ресурсы**: `2vCPU, 2ГБ RAM`
 **Подсеть**: `postgresql-update (10.10.0.0)`
 **IP-адрес**: `Публичный автоматический, внутренний 10.10.0.70`
@@ -83,7 +83,7 @@
 ssh -i /path/to/key user@ip
 ```
 ```
-ssh -i C:\Users\Mina-S\.ssh\ssh-postgresql-update stanislav@111.88.254.70
+ssh -i C:\Users\Mina-S\.ssh\ssh-postgresql-update stanislav@111.88.245.194
 ```
 
 ### Установка Terraform
