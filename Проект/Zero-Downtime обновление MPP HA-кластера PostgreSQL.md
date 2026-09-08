@@ -73,8 +73,11 @@
 **Зона доступности**: `ru-central1-a`
 **Диск**: `HDD 20ГБ`
 **Ресурсы**: `2vCPU, 2ГБ RAM`
-**Подсеть**: `postgresql-update (10.10.0.0)`
-**IP-адрес**: `Публичный автоматический, внутренний 10.10.0.70`
+**Подсеть**: 
+	`postgresql-update (10.10.0.0)`
+	`default-ru-central1-a (10.128.0.0)`
+**IP-адрес**: `Без публичного, внутренний 10.10.0.70`
+`Публичный динамический, внутренний 10.128.0.70`
 **Имя администратора**: `stanislav`
 **Имя ВМ**: `client`
 
@@ -83,9 +86,18 @@
 ssh -i /path/to/key user@ip
 ```
 ```
-ssh -i C:\Users\Mina-S\.ssh\ssh-postgresql-update stanislav@111.88.245.194
+ssh -i C:\Users\Mina-S\.ssh\ssh-postgresql-update stanislav@89.169.152.204
 ```
 
+Удалить дефолтный маршрут через сеть без внешнего IP:
+```
+sudo ip route del default via 10.10.0.1 dev eth0
+```
+
+Убедиться, что остался маршрут только через сеть с публичным адресом:
+```
+ip route show default
+```
 ### Установка Terraform
 
 Обновление системы:
@@ -179,6 +191,48 @@ yc iam key create \
   --output key.json
 ```
 
+# Настройка шлюза
+
+Включить пересылку пакетов:
+```
+sudo sysctl -w net.ipv4.ip_forward=1
+echo "net.ipv4.ip_forward = 1" | sudo tee -a /etc/sysctl.conf
+```
+
+Настроить masquerade для исходящего трафика:
+```
+sudo iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+```
+
+Сохранить правила iptables:
+```
+sudo apt update && sudo apt install -y iptables-persistent
+sudo netfilter-persistent save
+```
+
+Создать таблицу маршрутов с default route на client:
+```
+yc vpc route-table create \
+  --name nat-route-table \
+  --network-name default \
+  --route destination=0.0.0.0/0,next-hop=10.10.0.70
+```
+
+Привязать таблицу к существующей подсети:
+```
+yc vpc subnet update postgresql-update --route-table-name nat-route-table
+```
+
+Для отката изменений:
+```
+yc vpc subnet update postgresql-update --route-table-name ""
+yc vpc route-table delete nat-route-table
+
+sudo iptables -t nat -F
+sudo sysctl -w net.ipv4.ip_forward=0
+sudo sed -i '/net.ipv4.ip_forward/d' /etc/sysctl.conf
+sudo systemctl restart systemd-networkd   # или netplan apply
+```
 ### Настройка Terraform для YC
 
 Создаю директорию проекта:
@@ -202,9 +256,11 @@ yc config get folder-id
 b1gk5pe5h3541d01896e
 ```
 
-Переношу ssh-ключ для ВМ:
+Переношу закрытый и открытый ssh-ключи для ВМ:
 ```
-scp -i ssh-postgresql-update ssh-postgresql-update stanislav@111.88.254.70:/home/stanislav/terraform
+scp -i ssh-postgresql-update ssh-postgresql-update stanislav@89.169.152.204:/home/stanislav/terraform
+
+scp -i ssh-postgresql-update ssh-postgresql-update.pub stanislav@89.169.152.204:/home/stanislav/terraform
 ```
 
 Создаю файл конфигурации Terraform CLI:
@@ -268,3 +324,32 @@ terraform plan
 terraform apply
 ```
 
+# Настройка Ansible
+
+```
+mkdir -p ~/ansible && cd ~/ansible
+```
+
+```
+cp ~/terraform/ssh-postgresql-update ~/ansible
+```
+
+```
+nano ansible.cfg
+```
+
+```
+nano inventory.yml
+```
+
+```
+mkdir -p playbooks && cd playbooks
+```
+
+```
+nano install_postgresql_16.yml
+```
+
+# Сложности
+1. Не понял как создать ВМ с конкретным пользователем вместо ubuntu. Час потратил на то, чтобы понять почему не могу подключиться по ssh
+2. Проблема с установкой пакетов на ВМ без публичного адреса

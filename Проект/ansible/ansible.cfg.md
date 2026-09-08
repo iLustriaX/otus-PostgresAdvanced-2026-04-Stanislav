@@ -3,9 +3,9 @@
 # ansible.cfg
 
 [defaults]
-inventory = hosts.yml
+inventory = inventory.yml
 
-remote_user = stanislav
+remote_user = ubuntu
 private_key_file = ssh-postgresql-update
 host_key_checking = False
 

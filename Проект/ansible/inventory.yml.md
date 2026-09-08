@@ -1,6 +1,6 @@
 
 ```
-# hosts.yml
+# inventory.yml
 
 all:
   hosts:
