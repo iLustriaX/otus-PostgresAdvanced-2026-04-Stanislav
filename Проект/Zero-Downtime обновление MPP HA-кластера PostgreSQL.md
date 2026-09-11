@@ -86,7 +86,7 @@
 ssh -i /path/to/key user@ip
 ```
 ```
-ssh -i C:\Users\Mina-S\.ssh\ssh-postgresql-update stanislav@89.169.152.204
+ssh -i C:\Users\Mina-S\.ssh\ssh-postgresql-update stanislav@51.250.76.220
 ```
 
 Удалить дефолтный маршрут через сеть без внешнего IP:
@@ -201,7 +201,7 @@ echo "net.ipv4.ip_forward = 1" | sudo tee -a /etc/sysctl.conf
 
 Настроить masquerade для исходящего трафика:
 ```
-sudo iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+sudo iptables -t nat -A POSTROUTING -o eth1 -j MASQUERADE
 ```
 
 Сохранить правила iptables:
@@ -258,9 +258,14 @@ b1gk5pe5h3541d01896e
 
 Переношу закрытый и открытый ssh-ключи для ВМ:
 ```
-scp -i ssh-postgresql-update ssh-postgresql-update stanislav@89.169.152.204:/home/stanislav/terraform
+scp -i ssh-postgresql-update ssh-postgresql-update stanislav@51.250.76.220:/home/stanislav/terraform
 
-scp -i ssh-postgresql-update ssh-postgresql-update.pub stanislav@89.169.152.204:/home/stanislav/terraform
+scp -i ssh-postgresql-update ssh-postgresql-update.pub stanislav@51.250.76.220:/home/stanislav/terraform
+```
+
+Переношу файл ключа сервиса terraform для YC:
+```
+mv /tmp/key.json ~/terraform/
 ```
 
 Создаю файл конфигурации Terraform CLI:
