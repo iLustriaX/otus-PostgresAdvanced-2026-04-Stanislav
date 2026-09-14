@@ -43,7 +43,7 @@ all:
     balancers:
       hosts:
         balancer:
-    postgres_cluster:
+    postgresql_cluster:
       children:
         coord:
         workers:

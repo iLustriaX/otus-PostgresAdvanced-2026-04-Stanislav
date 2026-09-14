@@ -332,7 +332,7 @@ terraform apply
 # Настройка Ansible
 
 ```
-mkdir -p ~/ansible && cd ~/ansible
+mkdir -p ~/ansible
 ```
 
 ```
@@ -340,21 +340,43 @@ cp ~/terraform/ssh-postgresql-update ~/ansible
 ```
 
 ```
-nano ansible.cfg
+nano ~/ansible/ansible.cfg
 ```
 
 ```
-nano inventory.yml
+nano ~/ansible/inventory.yml
 ```
 
 ```
-mkdir -p playbooks && cd playbooks
+mkdir -p ~/ansible/playbooks
 ```
 
 ```
-nano install_postgresql_16.yml
+nano ~/ansible/playbooks/install_postgresql_16.yml
 ```
 
+```
+nano ~/ansible/playbooks/install_etcd.yml
+```
+
+```
+mkdir ~/ansible/templates
+```
+
+```
+nano ~/ansible/templates/etcd.conf.j2
+```
+
+```
+cd ~/ansible
+```
+
+```
+ansible-playbook install_postgresql_16.yml
+```
+```
+ansible-playbook install_etcd.yml
+```
 # Сложности
 1. Не понял как создать ВМ с конкретным пользователем вместо ubuntu. Час потратил на то, чтобы понять почему не могу подключиться по ssh
 2. Проблема с установкой пакетов на ВМ без публичного адреса
