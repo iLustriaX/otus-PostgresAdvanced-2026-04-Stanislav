@@ -34,17 +34,30 @@ all:
       hosts:
         coord1:
         coord2:
-    workers:
+      vars:
+        patroni_scope: "coord"
+    worker_cluster1:
       hosts:
         worker11:
         worker12:
+      vars:
+        patroni_scope: "worker1"
+    worker_cluster2:
+      hosts:
         worker21:
         worker22:
+      vars:
+        patroni_scope: "worker2"
+    workers:
+      children:
+        worker_cluster1:
+        worker_cluster2:
     balancers:
       hosts:
         balancer:
-    postgresql_cluster:
+    patroni:
       children:
         coord:
         workers:
+
 ```

@@ -2,30 +2,33 @@
 ```
 ---
 - name: Install PostgreSQL 16
-  hosts: postgres_cluster
+  hosts: patroni
   become: yes
-  
+
   tasks:
-    - name: Update and upgrade
+    - name: Download PostgreSQL repository key
+      get_url:
+        url: https://www.postgresql.org/media/keys/ACCC4CF8.asc
+        dest: /etc/apt/trusted.gpg.d/postgresql.asc
+        mode: "0644"
+
+    - name: Add PostgreSQL repository
+      apt_repository:
+        repo: "deb http://apt.postgresql.org/pub/repos/apt {{ ansible_distribution_release }}-pgdg main"
+        filename: pgdg
+        state: present
+
+    - name: Install PostgreSQL 16
       apt:
         update_cache: yes
-        upgrade: full
-	
-	- name: Download PostgreSQL repository key
-	  get_url:
-	    url: https://www.postgresql.org/media/keys/ACCC4CF8.asc
-	    dest: /etc/apt/trusted.gpg.d/postgresql.asc
-	    
-	- name: Add PostgreSQL repository
-	  apt_repository:
-	    repo: "deb http://apt.postgresql.org/pub/repos/apt {{ ansible_distribution_release }}-pgdg main"
-	    filename:pgdg
-	    
-	- name: Update
-	  apt:
-	    update_cache: yes
-	    
-	- name: Install PostgreSQL 16
-	  apt:
-	    name: postgresql-16
+        name: postgresql-16
+        state: present
+
+    - name: Stop and disable default PostgreSQL cluster
+      systemd:
+        name: postgresql
+        state: stopped
+        enabled: no
+      ignore_errors: yes
+      
 ```

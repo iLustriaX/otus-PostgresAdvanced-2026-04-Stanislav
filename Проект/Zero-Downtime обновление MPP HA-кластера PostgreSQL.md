@@ -1,4 +1,3 @@
-# План работ
 1. Развернуть инфраструктуру 
 2. Наполнить кластер данными
    - Загрузить тренировочную БД от Postgres Pro (например, demo-база среднего размера)
@@ -66,7 +65,7 @@
 
 ## Взаимодействие Patroni и etcd
 ![](../project/Pasted%20image%2020260826123708.png)
-# Разворачиваем инфраструктуру
+# Разворачиваю инфраструктуру
 ## Client
 Вручную разворачиваю ВМ Client в Yandex Cloud:
 **ОС**: `Ubuntu 24.04`
@@ -89,6 +88,16 @@ ssh -i /path/to/key user@ip
 ssh -i C:\Users\Mina-S\.ssh\ssh-postgresql-update stanislav@51.250.76.220
 ```
 
+Обновление системы:
+```bash
+sudo apt update && sudo apt upgrade -y
+```
+
+Установка клиента psql и pgbench:
+```
+sudo apt install postgresql
+```
+
 Удалить дефолтный маршрут через сеть без внешнего IP:
 ```
 sudo ip route del default via 10.10.0.1 dev eth0
@@ -99,11 +108,6 @@ sudo ip route del default via 10.10.0.1 dev eth0
 ip route show default
 ```
 ### Установка Terraform
-
-Обновление системы:
-```bash
-sudo apt update && sudo apt upgrade -y
-```
 
 ```bash
 sudo apt install -y unzip
@@ -360,6 +364,26 @@ nano ~/ansible/playbooks/install_etcd.yml
 ```
 
 ```
+nano ~/ansible/playbooks/install_patroni.yml
+```
+
+```
+nano ~/ansible/playbooks/install_haproxy.yml
+```
+
+```
+nano ~/ansible/playbooks/install_pgbouncer.yml
+```
+
+```
+nano ~/ansible/playbooks/install_citus.yml
+```
+
+```
+nano ~/ansible/playbooks/master.yml
+```
+
+```
 mkdir ~/ansible/templates
 ```
 
@@ -368,15 +392,459 @@ nano ~/ansible/templates/etcd.conf.j2
 ```
 
 ```
+nano ~/ansible/templates/patroni.yml.j2
+```
+
+```
+nano ~/ansible/templates/haproxy.cfg.j2
+```
+
+```
+nano ~/ansible/templates/pgbouncer.ini.j2
+```
+
+```
 cd ~/ansible
 ```
 
 ```
-ansible-playbook install_postgresql_16.yml
+ansible-playbook ~/ansible/playbooks/master.yml
+```
+
+Проверки:
+```
+ssh -i ~/ansible/ssh-postgresql-update ubuntu@dcs1
+
+sudo ETCDCTL_API=3 etcdctl --endpoints="http://10.10.0.10:2379,http://10.10.0.11:2379,http://10.10.0.12:2379" endpoint status -w table 
+```
+
+```
+ssh -i ~/ansible/ssh-postgresql-update ubuntu@coord1
+
+sudo patronictl -c /etc/patroni/config.yml topology
+```
+
+```
+psql -d coord-16 -U postgres -p 6432 -h balancer
+```
+
+```
+SELECT * FROM citus_check_cluster_node_health();
+```
+
+# pgbench
+
+```
+nano /tmp/select.sql
 ```
 ```
-ansible-playbook install_etcd.yml
+-- 1. Список кампаний с ненулевым бюджетом (простой фильтр + сортировка)
+SELECT id, name, state, monthly_budget
+FROM campaigns
+WHERE monthly_budget IS NOT NULL
+ORDER BY monthly_budget DESC
+LIMIT 10;
+-- 2. Количество рекламных объявлений по штатам кампаний (агрегация + JOIN)
+SELECT cmp.state, count(*) AS ads_count
+FROM ads a
+JOIN campaigns cmp ON cmp.id = a.campaign_id AND cmp.company_id = a.company_id
+GROUP BY cmp.state;
+```
+
+```
+nano /tmp/insert.sql
+```
+```
+\set id random(1, 99999999)
+
+INSERT INTO companies (id, name, created_at, updated_at)
+VALUES (:client_id * 100000000000 + :id,
+        'Company_' || :id,
+        now(), now());
+```
+
+```
+pgbench -f /tmp/select.sql -c 10 -j 2 -T 600 -P 5 -n -h balancer -p 6432 -U postgres coord-16
+```
+```
+pgbench -f /tmp/insert.sql -c 10 -j 2 -T 600 -P 5 -n -h balancer -p 6432 -U postgres coord-16
+```
+
+```
+ssh -i ~/ansible/ssh-postgresql-update ubuntu@balancer
+```
+
+```
+psql -h balancer -p 6432 -U postgres pgbouncer
+```
+```
+PAUSE coord;
+```
+
+```
+ssh -i ~/ansible/ssh-postgresql-update ubuntu@coord1
+```
+```
+sudo patronictl -c /etc/patroni/config.yml switchover
+```
+
+```
+RESUME coord;
+```
+
+# pg_upgrade
+
+```
+ssh -i ~/ansible/ssh-postgresql-update ubuntu@balancer
+```
+
+```
+sudo nano /etc/haproxy/haproxy.cfg
+```
+```
+global
+    maxconn 1000
+    log stdout format raw local0
+
+defaults
+    log     global
+    mode    tcp
+    option  tcplog
+    timeout connect 5s
+    timeout client  30s
+    timeout server  30s
+
+# Coord Primary PostgreSQL-16 — port 5000
+listen coord_primary_pg16
+    bind *:5000
+    mode tcp
+    option httpchk GET /
+    http-check expect status 200
+    server coord1 10.10.0.20:5432 check port 8008 inter 3s fall 3 rise 2
+
+# Worker1 Primary PostgreSQL-16 — port 5010
+listen worker1_primary_pg16
+    bind *:5010
+    mode tcp
+    option httpchk GET /
+    http-check expect status 200
+    server worker11 10.10.0.30:5432 check port 8008 inter 3s fall 3 rise 2
+
+# Worker2 Primary PostgreSQL-16 — port 5020
+listen worker2_primary_pg16
+    bind *:5020
+    mode tcp
+    option httpchk GET /
+    http-check expect status 200
+    server worker21 10.10.0.40:5432 check port 8008 inter 3s fall 3 rise 2
+
+
+# Coord Primary PostgreSQL-18 — port 5001
+listen coord_primary_pg18
+    bind *:5001
+    mode tcp
+    option httpchk GET /
+    http-check expect status 200
+    server coord1 10.10.0.21:5432 check port 8008 inter 3s fall 3 rise 2
+
+# Worker1 Primary PostgreSQL-18 — port 5011
+listen worker1_primary_pg18
+    bind *:5011
+    mode tcp
+    option httpchk GET /
+    http-check expect status 200
+    server worker11 10.10.0.31:5432 check port 8008 inter 3s fall 3 rise 2
+
+# Worker2 Primary PostgreSQL-18 — port 5021
+listen worker2_primary_pg18
+    bind *:5021
+    mode tcp
+    option httpchk GET /
+    http-check expect status 200
+    server worker21 10.10.0.41:5432 check port 8008 inter 3s fall 3 rise 2
+```
+
+```
+sudo systemctl reload haproxy
+```
+
+```
+sudo nano /etc/pgbouncer/pgbouncer.ini
+```
+```
+coord-18      = host=127.0.0.1 port=5001 dbname=postgres
+worker1-18    = host=127.0.0.1 port=5011 dbname=postgres
+worker2-18    = host=127.0.0.1 port=5021 dbname=postgres
+```
+```
+sudo systemctl reload pgbouncer
+```
+
+```
+ssh -i ~/ansible/ssh-postgresql-update ubuntu@coord2
+ssh -i ~/ansible/ssh-postgresql-update ubuntu@worker12
+ssh -i ~/ansible/ssh-postgresql-update ubuntu@worker22
+```
+
+```
+sudo patronictl -c /etc/patroni/config.yml topology
+sudo patronictl -c /etc/patroni/config.yml switchover --force
+```
+
+```
+sudo systemctl stop patroni
+sudo systemctl disable patroni
+```
+
+```
+sudo apt-get install postgresql-18 postgresql-18-citus-14.2 -y
+```
+
+```
+sudo mkdir -p /var/lib/postgresql/18/patroni
+sudo chown -R postgres:postgres /var/lib/postgresql/18
+sudo chmod 700 /var/lib/postgresql/18/patroni
+```
+
+```
+sudo nano /etc/patroni/config.yml
+```
+```
+namespace: /postgresql-18
+
+postgresql:
+  data_dir: /var/lib/postgresql/18/patroni
+  bin_dir: /usr/lib/postgresql/18/bin
+```
+
+```
+sudo systemctl start patroni
+sudo systemctl enable patroni
+```
+
+```
+psql -d coord-18 -U postgres -p 6432 -h balancer
+psql -d worker1-18 -U postgres -p 6432 -h balancer
+psql -d worker2-18 -U postgres -p 6432 -h balancer
+```
+```
+CREATE EXTENSION citus;
+```
+
+```
+psql -d coord-18 -U postgres -p 6432 -h balancer
+```
+```
+SELECT citus_set_coordinator_host('balancer', 5001);
+SELECT citus_add_node('balancer', 5011);
+SELECT citus_add_node('balancer', 5021);
+
+SELECT * FROM citus_check_cluster_node_health();
+```
+
+```
+ssh -i ~/ansible/ssh-postgresql-update ubuntu@coord2
+```
+```
+sudo apt install pgcopydb
+```
+```
+sudo pgcopydb clone --follow \
+  --source "postgres://postgres@balancer:5000/postgres" \
+  --target "postgres://postgres@balancer:5001/postgres" \
+  --table-jobs 8 \
+  --index-jobs 8 \
+  --slot-name pgcopydb_slot \
+  --create-slot
+```
+
+# Логическая репликация
+
+```
+psql -d coord-16 -p 6432 -U postgres -h balancer
+```
+```
+CREATE PUBLICATION companies_pub FOR TABLE companies;
+CREATE PUBLICATION campaigns_pub FOR TABLE campaigns;
+CREATE PUBLICATION ads_pub FOR TABLE ads;
+```
+```
+SELECT * FROM run_command_on_all_nodes($$ SELECT pg_create_logical_replication_slot('cdc_slot', 'pgoutput', false) $$);
+```
+
+```
+psql -d coord-18 -p 6432 -U postgres -h balancer
+```
+```
+CREATE SUBSCRIPTION coord_sub
+    CONNECTION 'host=balancer port=5000 user=postgres dbname=postgres'
+    PUBLICATION companies_pub, campaigns_pub, ads_pub
+    WITH (copy_data = true, create_slot = false, slot_name = 'cdc_slot');
+    
+CREATE SUBSCRIPTION worker1_sub
+    CONNECTION 'host=balancer port=5010 user=postgres dbname=postgres'
+    PUBLICATION companies_pub, campaigns_pub, ads_pub
+    WITH (copy_data = false, create_slot = false, slot_name = 'cdc_slot');
+    
+CREATE SUBSCRIPTION worker2_sub
+    CONNECTION 'host=balancer port=5020 user=postgres dbname=postgres'
+    PUBLICATION companies_pub, campaigns_pub, ads_pub
+    WITH (copy_data = false, create_slot = false, slot_name = 'cdc_slot');
+```
+
+```
+psql -d worker1-18 -p 6432 -U postgres -h balancer
+```
+```
+CREATE SUBSCRIPTION coord_sub
+    CONNECTION 'host=balancer port=5000 user=postgres dbname=postgres'
+    PUBLICATION companies_pub, campaigns_pub, ads_pub
+    WITH (copy_data = false, create_slot = false, slot_name = 'cdc_slot_worker1');
+    
+CREATE SUBSCRIPTION worker1_sub
+    CONNECTION 'host=balancer port=5010 user=postgres dbname=postgres'
+    PUBLICATION companies_pub, campaigns_pub, ads_pub
+    WITH (copy_data = false, create_slot = false, slot_name = 'cdc_slot_worker1');
+    
+CREATE SUBSCRIPTION worker2_sub
+    CONNECTION 'host=balancer port=5020 user=postgres dbname=postgres'
+    PUBLICATION companies_pub, campaigns_pub, ads_pub
+    WITH (copy_data = false, create_slot = false, slot_name = 'cdc_slot_worker1');
+```
+
+```
+psql -d worker2-18 -p 6432 -U postgres -h balancer
+```
+```
+CREATE SUBSCRIPTION coord_sub
+    CONNECTION 'host=balancer port=5000 user=postgres dbname=postgres'
+    PUBLICATION companies_pub, campaigns_pub, ads_pub
+    WITH (copy_data = false, create_slot = false, slot_name = 'cdc_slot_worker2');
+    
+CREATE SUBSCRIPTION worker1_sub
+    CONNECTION 'host=balancer port=5010 user=postgres dbname=postgres'
+    PUBLICATION companies_pub, campaigns_pub, ads_pub
+    WITH (copy_data = false, create_slot = false, slot_name = 'cdc_slot_worker2');
+    
+CREATE SUBSCRIPTION worker2_sub
+    CONNECTION 'host=balancer port=5020 user=postgres dbname=postgres'
+    PUBLICATION companies_pub, campaigns_pub, ads_pub
+    WITH (copy_data = false, create_slot = false, slot_name = 'cdc_slot_worker2');
+```
+
+```
+ALTER SUBSCRIPTION companies_sub DISABLE;
+ALTER SUBSCRIPTION companies_sub SET (slot_name = NONE);
+DROP SUBSCRIPTION companies_sub;
+
+ALTER SUBSCRIPTION campaigns_sub DISABLE;
+ALTER SUBSCRIPTION campaigns_sub SET (slot_name = NONE);
+DROP SUBSCRIPTION campaigns_sub;
+
+ALTER SUBSCRIPTION ads_sub DISABLE;
+ALTER SUBSCRIPTION ads_sub SET (slot_name = NONE);
+DROP SUBSCRIPTION ads_sub;
+```
+
+```
+SELECT count(*) FROM companies;
+SELECT count(*) FROM campaigns;
+SELECT count(*) FROM ads;
+```
+
+```
+Создание дампа схемы со старого кластера:
+pg_dump --format=plain --no-owner --schema-only --file=schema.sql postgres://user:pass@old_coordinator:5432/dbname
+
+Применение схемы на новом координаторе:
+psql -f schema.sql postgres://user:pass@new_coordinator:5432/dbname
+
+Распределение таблиц на новом кластере:  
+SELECT create_distributed_table('companies', 'id');
+SELECT create_distributed_table('campaigns', 'company_id');
+SELECT create_distributed_table('ads', 'company_id');
+
+
+На координаторе старого кластера создать публикации:
+CREATE PUBLICATION companies_pub FOR TABLE companies;
+CREATE PUBLICATION campaigns_pub FOR TABLE campaigns;
+CREATE PUBLICATION ads_pub FOR TABLE ads;
+
+#### 3.2. Создание слотов репликации на всех узлах старого кластера
+
+На координаторе старого кластера создать слоты репликации:
+
+SELECT * FROM run_command_on_all_nodes($$ SELECT pg_create_logical_replication_slot('cdc_slot', 'pgoutput', false) $$);
+
+На координаторе нового кластера:
+
+CREATE SUBSCRIPTION sub_from_coord
+    CONNECTION 'host=old-coord port=5432 user=repl_user password=... dbname=your_db'
+    PUBLICATION items_pub
+    WITH (copy_data = true, create_slot = false, slot_name = 'cdc_slot');
+
+На воркере 1:
+
+CREATE SUBSCRIPTION sub_from_worker1
+    CONNECTION 'host=old-worker-1 port=5432 user=repl_user password=... dbname=your_db'
+    PUBLICATION items_pub
+    WITH (copy_data = false, create_slot = false, slot_name = 'cdc_slot');
+
+На воркере 2:
+CREATE SUBSCRIPTION sub_from_worker2
+    CONNECTION 'host=old-worker-2 port=5432 user=repl_user password=... dbname=your_db'
+    PUBLICATION items_pub
+    WITH (copy_data = false, create_slot = false, slot_name = 'cdc_slot');
+
+
+
+#### 3.4. Мониторинг репликации
+-- Статус подписок
+SELECT * FROM pg_stat_subscription;
+-- Прогресс начальной синхронизации
+SELECT * FROM pg_stat_subscription_stats;
 ```
 # Сложности
 1. Не понял как создать ВМ с конкретным пользователем вместо ubuntu. Час потратил на то, чтобы понять почему не могу подключиться по ssh
 2. Проблема с установкой пакетов на ВМ без публичного адреса
+
+# Заметки:
+
+[External Integrations - Citus for PostgreSQL | Microsoft Learn](https://learn.microsoft.com/en-us/postgresql/citus/integrations?view=citus-14)
+[Big Database Migration - Citus for PostgreSQL | Microsoft Learn](https://learn.microsoft.com/en-us/postgresql/citus/migrate/migration-data-big?view=citus-14)
+[Small Database Migration - Citus for PostgreSQL | Microsoft Learn](https://learn.microsoft.com/en-us/postgresql/citus/migrate/migration-data-small?view=citus-14)
+
+Можно использовать pgcopydb для логической репликации
+
+Используется 14 версия citus, т.к. она поддерживается в pg18.
+
+Чтобы подключение клиента не разрывалось при переключении, нужно остановить пул в pgbouncer
+
+При создании подписок нельзя подключаться через pgbouncer:
+```
+CREATE SUBSCRIPTION companies_sub
+    CONNECTION 'host=balancer port=5000 user=postgres dbname=postgres'
+    PUBLICATION companies_pub
+    WITH (copy_data = true, create_slot = false, slot_name = 'cdc_slot');
+```
+
+Сообщение `unsupported startup parameter: replication` означает, что при установке соединения для логической репликации PostgreSQL передает в стартовом пакете параметр `replication`. PgBouncer не умеет обрабатывать этот параметр и разрывает соединение.
+![](../project/Pasted%20image%2020260918104314.png)
+
+
+Создавал по отдельнйо подписке на каждую публикацию. При этом использовал один слот публикации.
+![](../project/Pasted%20image%2020260918115801.png)
+
+```
+SELECT count(*) FROM companies;
+SELECT count(*) FROM campaigns;
+SELECT count(*) FROM ads;
+```
+
+```
+SELECT pg_size_pretty(citus_total_relation_size('companies'));
+SELECT pg_size_pretty(citus_total_relation_size('ads'));
+SELECT pg_size_pretty(citus_total_relation_size('campaigns'));
+```
+
+pgcopydb идёт вместе с репозиторием pgdg
